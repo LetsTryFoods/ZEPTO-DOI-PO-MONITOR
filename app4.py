@@ -162,73 +162,92 @@ if sales_file and inventory_file and po_file and fill_rate_file and x_days:
 
     st.subheader("📊 View DOI Summary")
 
+    if "pan_india_option" not in st.session_state:
+        st.session_state.pan_india_option = "None"
+    if "individual_sku" not in st.session_state:
+        st.session_state.individual_sku = "None"
+    if "individual_city" not in st.session_state:
+        st.session_state.individual_city = "None"
+
+    # --- Callback functions to reset others ---
+    def set_pan_india():
+        st.session_state.individual_sku = "None"
+        st.session_state.individual_city = "None"
+
+    def set_individual_sku():
+        st.session_state.pan_india_option = "None"
+        st.session_state.individual_city = "None"
+
+    def set_individual_city():
+        st.session_state.pan_india_option = "None"
+        st.session_state.individual_sku = "None"
+
     # --- Filter Options ---
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        pan_india_option = st.selectbox("Pan India View", options=["None", "Product wise", "City wise"])
+        
+        st.selectbox(
+            "Pan India View",
+            options=["None", "Product wise", "City wise"],
+            key="pan_india_option",
+            on_change=set_pan_india
+        )
 
     with col2:
+
         sku_list = final_df["SKU Name"].dropna().sort_values().unique()
-        individual_sku = st.selectbox("Individual SKU View", options=["None"] + list(sku_list))
+        st.selectbox(
+            "Individual SKU View",
+            options=["None"] + list(sku_list),
+            key="individual_sku",
+            on_change=set_individual_sku
+        )
 
     with col3:
+
         city_list = final_df["City"].dropna().sort_values().unique()
-        individual_city = st.selectbox("Individual CIty View", options=["None"] + list(city_list))
+        st.selectbox(
+            "Individual City View",
+            options=["None"] + list(city_list),
+            key="individual_city",
+            on_change=set_individual_city
+        )
+
 
     # --- Display Logic ---
-
-    if pan_india_option != "None":
-        individual_sku = "None"
-        individual_city = "None"
-        
-        if pan_india_option == "Product wise":
-            grouped = (
-                final_df.groupby("SKU Name", as_index=False)
-                .agg({"Sales Units": "sum", "Inventory Units": "sum"})
-            )
-        elif pan_india_option == "City wise":
-            grouped = (
-                final_df.groupby("City", as_index=False)
-                .agg({"Sales Units": "sum", "Inventory Units": "sum"})
-            )
-
+    if st.session_state.pan_india_option != "None":
+        if st.session_state.pan_india_option == "Product wise":
+            grouped = final_df.groupby("SKU Name", as_index=False).agg({
+                "Sales Units": "sum", "Inventory Units": "sum"
+            })
+        elif st.session_state.pan_india_option == "City wise":
+            grouped = final_df.groupby("City", as_index=False).agg({
+                "Sales Units": "sum", "Inventory Units": "sum"
+            })
+    
         result_df = calculate_doi(grouped, x_days)
-        st.write(f"📌 Showing **{pan_india_option}** level DOI summary")
+        st.write(f"📌 Showing **{st.session_state.pan_india_option}** level DOI summary")
         st.dataframe(result_df, use_container_width=True)
-
-    elif individual_sku != "None":
-
-        pan_india_option = "None"
-        individual_city = "None"
-        
-        filtered_sku_df = final_df[final_df["SKU Name"] == individual_sku]
-
-        grouped = (
-            # filtered_sku_df.groupby(["SKU Number","SKU Name", "City"], as_index=False)
-            filtered_sku_df.groupby(["SKU Name", "City"], as_index=False)
-            .agg({"Sales Units": "sum", "Inventory Units": "sum"})
-        )
-
+    
+    elif st.session_state.individual_sku != "None":
+        filtered_sku_df = final_df[final_df["SKU Name"] == st.session_state.individual_sku]
+        grouped = filtered_sku_df.groupby(["SKU Name", "City"], as_index=False).agg({
+            "Sales Units": "sum", "Inventory Units": "sum"
+        })
+    
         result_df = calculate_doi(grouped, x_days)
-        st.write(f"📌 Showing DOI for **{individual_sku}** across cities")
+        st.write(f"📌 Showing DOI for **{st.session_state.individual_sku}** across cities")
         st.dataframe(result_df, use_container_width=True)
-
-    elif individual_city != "None":
-
-        pan_india_option = "None"
-        individual_sku = "None"
-        
-        filtered_sku_df = final_df[final_df["City"] == individual_city]
-
-        grouped = (
-            
-            filtered_sku_df.groupby(["City", "SKU Name"], as_index=False)
-            .agg({"Sales Units": "sum", "Inventory Units": "sum"})
-        )
+    
+    elif st.session_state.individual_city != "None":
+        filtered_city_df = final_df[final_df["City"] == st.session_state.individual_city]
+        grouped = filtered_city_df.groupby(["City", "SKU Name"], as_index=False).agg({
+            "Sales Units": "sum", "Inventory Units": "sum"
+        })
 
         result_df = calculate_doi(grouped, x_days)
-        st.write(f"📌 Showing DOI for **{individual_city}** across all products")
+        st.write(f"📌 Showing DOI for **{st.session_state.individual_city}** across all products")
         st.dataframe(result_df, use_container_width=True)
 
 
