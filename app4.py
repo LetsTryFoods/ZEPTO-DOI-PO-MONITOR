@@ -163,7 +163,7 @@ if sales_file and inventory_file and po_file and fill_rate_file and x_days:
     st.subheader("📊 View DOI Summary")
 
     # --- Filter Options ---
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         pan_india_option = st.selectbox("Pan India View", options=["None", "Product wise", "City wise"])
@@ -172,9 +172,16 @@ if sales_file and inventory_file and po_file and fill_rate_file and x_days:
         sku_list = final_df["SKU Name"].dropna().sort_values().unique()
         individual_sku = st.selectbox("Individual SKU View", options=["None"] + list(sku_list))
 
+    with col3:
+        city_list = final_df["City"].dropna().sort_values().unique()
+        individual_city = st.selectbox("Individual CIty View", options=["None"] + list(city_list))
+
     # --- Display Logic ---
 
     if pan_india_option != "None":
+        individual_sku = "None"
+        individual_city = "None"
+        
         if pan_india_option == "Product wise":
             grouped = (
                 final_df.groupby("SKU Name", as_index=False)
@@ -191,6 +198,10 @@ if sales_file and inventory_file and po_file and fill_rate_file and x_days:
         st.dataframe(result_df, use_container_width=True)
 
     elif individual_sku != "None":
+
+        pan_india_option = "None"
+        individual_city = "None"
+        
         filtered_sku_df = final_df[final_df["SKU Name"] == individual_sku]
 
         grouped = (
@@ -201,6 +212,23 @@ if sales_file and inventory_file and po_file and fill_rate_file and x_days:
 
         result_df = calculate_doi(grouped, x_days)
         st.write(f"📌 Showing DOI for **{individual_sku}** across cities")
+        st.dataframe(result_df, use_container_width=True)
+
+    elif individual_city != "None":
+
+        pan_india_option = "None"
+        individual_sku = "None"
+        
+        filtered_sku_df = final_df[final_df["City"] == individual_city]
+
+        grouped = (
+            
+            filtered_sku_df.groupby(["City", "SKU Name"], as_index=False)
+            .agg({"Sales Units": "sum", "Inventory Units": "sum"})
+        )
+
+        result_df = calculate_doi(grouped, x_days)
+        st.write(f"📌 Showing DOI for **{individual_city}** across all products")
         st.dataframe(result_df, use_container_width=True)
 
 
