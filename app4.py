@@ -24,7 +24,7 @@ if sales_file and inventory_file and po_file and fill_rate_file and x_days:
     # Read files
     sales_df = pd.read_csv(sales_file, usecols=["Date", "SKU Number", "SKU Name", "City", "Sales (Qty) - Units"])
     inventory_df = pd.read_csv(inventory_file, usecols=["City", "SKU Name", "SKU Code", "Units"])
-    po_df = pd.read_csv(po_file, usecols=['PO No.', 'PO Date', 'Status', 'Del Location', 'SKU', 'SKU Desc', 'ASN Quantity', 'GRN Quantity'])
+    po_df = pd.read_csv(po_file, usecols=['PO No.', 'PO Date', 'Status', 'Del Location', 'SKU', 'SKU Desc', 'Qty', 'GRN Quantity'])
     fill_rate_df = pd.read_csv(fill_rate_file, usecols=["PO Date", "PO Code", "GRN Date", "SKU ID", "SKU Name", "City", "Warehouse Name", "PO Quantity", "GRN Quantity"])
 
     # Preprocessing fill rate file 
