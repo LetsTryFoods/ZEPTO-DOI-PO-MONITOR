@@ -36,7 +36,7 @@ if sales_file and inventory_file and po_file and fill_rate_file and x_days:
 
         # Preprocessing po file 
 
-        po_df = po_df.rename(columns = {'PO No.' : 'PO Code', 'Del Location' : 'Warehouse Name', 'SKU': 'SKU ID', 'SKU Desc':'SKU Name', 'ASN Quantity' : 'PO Quantity'})
+        po_df = po_df.rename(columns = {'PO No.' : 'PO Code', 'Del Location' : 'Warehouse Name', 'SKU': 'SKU ID', 'SKU Desc':'SKU Name', 'Qty' : 'PO Quantity'})
         filtered_PO_df = po_df[po_df['Status'].isin(['PENDING_ACKNOWLEDGEMENT', 'PENDING_GRN'])]
         filtered_PO_df['PO Date'] = pd.to_datetime(filtered_PO_df['PO Date'], format='%d %b %Y %I:%M %p')
 
