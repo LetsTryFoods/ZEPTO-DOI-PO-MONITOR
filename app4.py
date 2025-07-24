@@ -262,86 +262,162 @@ if sales_file and inventory_file and po_file and fill_rate_file and x_days:
     final_po_df['PO Date'] = final_po_df['PO Date'].dt.date
 
 
-    # --- Layout for date range and product selection ---
-    col1, col2, col3 = st.columns([1, 1, 1])
+    # # --- Layout for date range and product selection ---
+    # col1, col2, col3 = st.columns([1, 1, 1])
+
+    # # Default dates
+    # today = datetime.today().date()
+    # default_from_date = today - timedelta(days=7)
+
+    # # From and To Date Inputs
+    # with col1:
+    #     from_date = st.date_input("📅 From Date", value=default_from_date, max_value=today)
+
+    # with col2:
+    #     to_date = st.date_input("📅 To Date", value=today, min_value=from_date)
+
+    # # Filter GRN DataFrame based on selected date range
+    # filtered_fill_rate_df = final_po_df[(final_po_df['GRN Date'] >= from_date) & (final_po_df['GRN Date'] <= to_date)]
+
+    # # Proceed only if filtered GRN data exists
+    # if not filtered_fill_rate_df.empty:
+
+    #     # Get product list from PO data
+    #     product_options = filtered_fill_rate_df['SKU Name'].dropna().unique()
+
+    #     with col3:
+    #         selected_product = st.selectbox("🧃 Select Product", options=sorted(product_options))
+
+    #     # If product selected, filter and show final data
+    #     if selected_product:
+    #         grn_df = filtered_fill_rate_df[filtered_fill_rate_df['SKU Name'] == selected_product].copy()
+    #         grn_df = grn_df[["SKU Name", "City", "PO Quantity", "GRN Quantity"]]
+    #         grouped_grn_df = grn_df.groupby(['SKU Name','City'], as_index=False)[['PO Quantity', 'GRN Quantity']].sum()
+
+    #         open_po_df = final_po_df[final_po_df['GRN Date'].isna()]
+    #         open_po_df = open_po_df[open_po_df['SKU Name'] == selected_product].copy()
+
+    #         open_po_df = open_po_df.groupby(['City', 'SKU Name'], as_index=False).agg({
+    #             'PO Quantity': 'sum'
+    #         }).rename(columns={'PO Quantity': 'Open PO Quantity'})
+
+    #         # Outer join
+    #         final_df = pd.merge(grouped_grn_df, open_po_df, on=['City', 'SKU Name'], how='outer')
+
+    #         final_df[['PO Quantity', 'GRN Quantity', 'Open PO Quantity']] = final_df[[
+    #             'PO Quantity', 'GRN Quantity', 'Open PO Quantity'
+    #         ]].fillna(0)
+
+    #         # Add GRN Status column
+    #         # grouped_grn_df['GRN Status'] = grouped_grn_df['GRN Quantity'].apply(
+    #         #     lambda x: 'Completed' if pd.notnull(x) and x != 0 else 'Pending'
+    #         # )
+
+    #         # Display
+    #         st.write(
+    #             f"📌 PO records for **{selected_product}** between **{from_date.strftime('%d %b %Y')}** and **{to_date.strftime('%d %b %Y')}**"
+    #         )
+    #         st.dataframe(
+    #             final_df,
+    #             use_container_width=True
+    #         )
+
+
+# --- Layout for date range and product/city selection ---
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
 
     # Default dates
     today = datetime.today().date()
     default_from_date = today - timedelta(days=7)
-
+    
+    # Initialize session states for mutual exclusivity
+    if 'selected_product' not in st.session_state:
+        st.session_state.selected_product = None
+    if 'selected_city' not in st.session_state:
+        st.session_state.selected_city = None
+    
     # From and To Date Inputs
     with col1:
         from_date = st.date_input("📅 From Date", value=default_from_date, max_value=today)
-
+    
     with col2:
         to_date = st.date_input("📅 To Date", value=today, min_value=from_date)
-
+    
     # Filter GRN DataFrame based on selected date range
-    filtered_fill_rate_df = final_po_df[(final_po_df['GRN Date'] >= from_date) & (final_po_df['GRN Date'] <= to_date)]
-
-    # Proceed only if filtered GRN data exists
+    filtered_fill_rate_df = final_po_df[
+        (final_po_df['GRN Date'] >= from_date) & (final_po_df['GRN Date'] <= to_date)
+    ]
+    
     if not filtered_fill_rate_df.empty:
-
-        # Get product list from PO data
         product_options = filtered_fill_rate_df['SKU Name'].dropna().unique()
-
+        city_options = filtered_fill_rate_df['City'].dropna().unique()
+    
+        # SKU Selection
+        def on_product_change():
+            st.session_state.selected_city = None
+    
         with col3:
-            selected_product = st.selectbox("🧃 Select Product", options=sorted(product_options))
-
-        # If product selected, filter and show final data
-        if selected_product:
-            grn_df = filtered_fill_rate_df[filtered_fill_rate_df['SKU Name'] == selected_product].copy()
-
-            grn_df = grn_df[["SKU Name", "City", "PO Quantity", "GRN Quantity"]]
-
-            # final_df.groupby(["SKU Name"], as_index=False)[["PO Quantity", "GRN Quantity"]].sum()
-
-            grouped_grn_df = grn_df.groupby(['SKU Name','City'], as_index=False)[['PO Quantity', 'GRN Quantity']].sum()
-
-            # st.write(
-            #     f"GRN DF"
-            # )
-            # st.dataframe(
-            #     grouped_grn_df,
-            #     use_container_width=True
-            # )
-
-
+            selected_product = st.selectbox(
+                "🧃 Select Product",
+                options=["None"] + sorted(product_options),
+                index=0 if st.session_state.selected_product is None else sorted(product_options).tolist().index(st.session_state.selected_product) + 1,
+                key='selected_product',
+                on_change=on_product_change
+            )
+    
+        # City Selection
+        def on_city_change():
+            st.session_state.selected_product = None
+    
+        with col4:
+            selected_city = st.selectbox(
+                "🏙️ Select City",
+                options=["None"] + sorted(city_options),
+                index=0 if st.session_state.selected_city is None else sorted(city_options).tolist().index(st.session_state.selected_city) + 1,
+                key='selected_city',
+                on_change=on_city_change
+            )
+    
+        # Determine filter condition
+        if selected_product != "None":
+            filter_df = filtered_fill_rate_df[filtered_fill_rate_df['SKU Name'] == selected_product]
+        elif selected_city != "None":
+            filter_df = filtered_fill_rate_df[filtered_fill_rate_df['City'] == selected_city]
+        else:
+            filter_df = pd.DataFrame()  # Empty if neither selected
+    
+        if not filter_df.empty:
+            grn_df = filter_df[["SKU Name", "City", "PO Quantity", "GRN Quantity"]]
+            grouped_grn_df = grn_df.groupby(['SKU Name', 'City'], as_index=False)[['PO Quantity', 'GRN Quantity']].sum()
+    
             open_po_df = final_po_df[final_po_df['GRN Date'].isna()]
-            open_po_df = open_po_df[open_po_df['SKU Name'] == selected_product].copy()
-
+    
+            if selected_product != "None":
+                open_po_df = open_po_df[open_po_df['SKU Name'] == selected_product]
+            elif selected_city != "None":
+                open_po_df = open_po_df[open_po_df['City'] == selected_city]
+    
             open_po_df = open_po_df.groupby(['City', 'SKU Name'], as_index=False).agg({
                 'PO Quantity': 'sum'
             }).rename(columns={'PO Quantity': 'Open PO Quantity'})
-
-            # st.write(
-            #     f"PO DF"
-            # )
-            # st.dataframe(
-            #     open_po_df,
-            #     use_container_width=True
-            # )
-
-            # Outer join
+    
             final_df = pd.merge(grouped_grn_df, open_po_df, on=['City', 'SKU Name'], how='outer')
-
+    
             final_df[['PO Quantity', 'GRN Quantity', 'Open PO Quantity']] = final_df[[
                 'PO Quantity', 'GRN Quantity', 'Open PO Quantity'
             ]].fillna(0)
+    
+            selection_label = f"📌 PO records for "
+            if selected_product != "None":
+                selection_label += f"**{selected_product}**"
+            elif selected_city != "None":
+                selection_label += f"**{selected_city}**"
+    
+            selection_label += f" between **{from_date.strftime('%d %b %Y')}** and **{to_date.strftime('%d %b %Y')}**"
+    
+            st.write(selection_label)
+            st.dataframe(final_df, use_container_width=True)
 
-            # Add GRN Status column
-            # grouped_grn_df['GRN Status'] = grouped_grn_df['GRN Quantity'].apply(
-            #     lambda x: 'Completed' if pd.notnull(x) and x != 0 else 'Pending'
-            # )
-
-            # Display
-            st.write(
-                f"📌 PO records for **{selected_product}** between **{from_date.strftime('%d %b %Y')}** and **{to_date.strftime('%d %b %Y')}**"
-            )
-            st.dataframe(
-                final_df,
-                use_container_width=True
-            )
 
     else:
         st.warning("No GRN data available in the selected date range.")
