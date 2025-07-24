@@ -322,100 +322,105 @@ if sales_file and inventory_file and po_file and fill_rate_file and x_days:
     #             use_container_width=True
     #         )
 
-
-# --- Layout for date range and product/city selection ---
-    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
-
+    # --- Setup default session state values ---
+    if "selected_grn_sku" not in st.session_state:
+        st.session_state.selected_grn_sku = "None"
+    if "selected_grn_city" not in st.session_state:
+        st.session_state.selected_grn_city = "None"
+    
+    # --- Callback functions to clear the other when one is selected ---
+    def on_select_sku():
+        if st.session_state.selected_grn_sku != "None":
+            st.session_state.selected_grn_city = "None"
+    
+    def on_select_city():
+        if st.session_state.selected_grn_city != "None":
+            st.session_state.selected_grn_sku = "None"
+    
+    # --- 4-column layout: From Date, To Date, SKU, City ---
+    col1, col2, col3, col4 = st.columns(4)
+    
     # Default dates
     today = datetime.today().date()
     default_from_date = today - timedelta(days=7)
     
-    # Initialize session states for mutual exclusivity
-    if 'selected_product' not in st.session_state:
-        st.session_state.selected_product = None
-    if 'selected_city' not in st.session_state:
-        st.session_state.selected_city = None
-    
-    # From and To Date Inputs
+    # Date inputs
     with col1:
         from_date = st.date_input("📅 From Date", value=default_from_date, max_value=today)
     
     with col2:
         to_date = st.date_input("📅 To Date", value=today, min_value=from_date)
     
-    # Filter GRN DataFrame based on selected date range
+    # Filter base DataFrame by date range
     filtered_fill_rate_df = final_po_df[
         (final_po_df['GRN Date'] >= from_date) & (final_po_df['GRN Date'] <= to_date)
     ]
     
+    # Proceed if filtered data exists
     if not filtered_fill_rate_df.empty:
-        product_options = filtered_fill_rate_df['SKU Name'].dropna().unique()
-        city_options = filtered_fill_rate_df['City'].dropna().unique()
-    
-        # SKU Selection
-        def on_product_change():
-            st.session_state.selected_city = None
+        # Fetch filter options
+        sku_options = sorted(filtered_fill_rate_df['SKU Name'].dropna().unique())
+        city_options = sorted(filtered_fill_rate_df['City'].dropna().unique())
     
         with col3:
-            selected_product = st.selectbox(
+            st.selectbox(
                 "🧃 Select Product",
-                options=["None"] + sorted(product_options),
-                index=0 if st.session_state.selected_product is None else sorted(product_options).tolist().index(st.session_state.selected_product) + 1,
-                key='selected_product',
-                on_change=on_product_change
+                options=["None"] + sku_options,
+                key="selected_grn_sku",
+                on_change=on_select_sku
             )
-    
-        # City Selection
-        def on_city_change():
-            st.session_state.selected_product = None
     
         with col4:
-            selected_city = st.selectbox(
+            st.selectbox(
                 "🏙️ Select City",
-                options=["None"] + sorted(city_options),
-                index=0 if st.session_state.selected_city is None else sorted(city_options).tolist().index(st.session_state.selected_city) + 1,
-                key='selected_city',
-                on_change=on_city_change
+                options=["None"] + city_options,
+                key="selected_grn_city",
+                on_change=on_select_city
             )
     
-        # Determine filter condition
-        if selected_product != "None":
-            filter_df = filtered_fill_rate_df[filtered_fill_rate_df['SKU Name'] == selected_product]
-        elif selected_city != "None":
-            filter_df = filtered_fill_rate_df[filtered_fill_rate_df['City'] == selected_city]
-        else:
-            filter_df = pd.DataFrame()  # Empty if neither selected
+        # Get selections from session state
+        selected_grn_sku = st.session_state.selected_grn_sku
+        selected_grn_city = st.session_state.selected_grn_city
     
-        if not filter_df.empty:
-            grn_df = filter_df[["SKU Name", "City", "PO Quantity", "GRN Quantity"]]
+        # --- Filtering based on selection ---
+        if selected_grn_sku != "None":
+            grn_df = filtered_fill_rate_df[filtered_fill_rate_df['SKU Name'] == selected_grn_sku].copy()
+        elif selected_grn_city != "None":
+            grn_df = filtered_fill_rate_df[filtered_fill_rate_df['City'] == selected_grn_city].copy()
+        else:
+            grn_df = pd.DataFrame()
+    
+        # --- Proceed if filtered data exists ---
+        if not grn_df.empty:
+            grn_df = grn_df[["SKU Name", "City", "PO Quantity", "GRN Quantity"]]
             grouped_grn_df = grn_df.groupby(['SKU Name', 'City'], as_index=False)[['PO Quantity', 'GRN Quantity']].sum()
     
-            open_po_df = final_po_df[final_po_df['GRN Date'].isna()]
-    
-            if selected_product != "None":
-                open_po_df = open_po_df[open_po_df['SKU Name'] == selected_product]
-            elif selected_city != "None":
-                open_po_df = open_po_df[open_po_df['City'] == selected_city]
+            if selected_grn_sku != "None":
+                open_po_df = final_po_df[
+                    (final_po_df['GRN Date'].isna()) & (final_po_df['SKU Name'] == selected_grn_sku)
+                ].copy()
+            elif selected_grn_city != "None":
+                open_po_df = final_po_df[
+                    (final_po_df['GRN Date'].isna()) & (final_po_df['City'] == selected_grn_city)
+                ].copy()
+            else:
+                open_po_df = pd.DataFrame()
     
             open_po_df = open_po_df.groupby(['City', 'SKU Name'], as_index=False).agg({
                 'PO Quantity': 'sum'
             }).rename(columns={'PO Quantity': 'Open PO Quantity'})
     
+            # Merge and fill
             final_df = pd.merge(grouped_grn_df, open_po_df, on=['City', 'SKU Name'], how='outer')
+            final_df[['PO Quantity', 'GRN Quantity', 'Open PO Quantity']] = final_df[
+                ['PO Quantity', 'GRN Quantity', 'Open PO Quantity']
+            ].fillna(0)
     
-            final_df[['PO Quantity', 'GRN Quantity', 'Open PO Quantity']] = final_df[[
-                'PO Quantity', 'GRN Quantity', 'Open PO Quantity'
-            ]].fillna(0)
-    
-            selection_label = f"📌 PO records for "
-            if selected_product != "None":
-                selection_label += f"**{selected_product}**"
-            elif selected_city != "None":
-                selection_label += f"**{selected_city}**"
-    
-            selection_label += f" between **{from_date.strftime('%d %b %Y')}** and **{to_date.strftime('%d %b %Y')}**"
-    
-            st.write(selection_label)
+            # Display
+            title_context = f"**{selected_grn_sku}**" if selected_grn_sku != "None" else f"**{selected_grn_city}**"
+            st.write(
+                f"📌 PO records for {title_context} between **{from_date.strftime('%d %b %Y')}** and **{to_date.strftime('%d %b %Y')}**"
+            )
             st.dataframe(final_df, use_container_width=True)
 
 
